@@ -1,4 +1,4 @@
-include_directories(${PROJECT_SOURCE_DIR}/sense-voice/csrc)
+include_directories(${PROJECT_SOURCE_DIR}/include)
 # find_package(SDL2 REQUIRED)
 # include_directories(${SDL2_INCLUDE_DIRS})
 add_executable(sense-voice-stream stream.cc)

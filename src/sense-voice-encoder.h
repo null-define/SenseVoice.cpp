@@ -7,7 +7,7 @@
 
 
 #include <ggml.h>
-#include "common.h"
+#include "sense-voice-common.h"
 
 
 // ############ model structure #############

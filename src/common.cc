@@ -5,7 +5,7 @@
 // logging
 //
 
-#include "common.h"
+#include "sense-voice-common.h"
 #include <stdarg.h>
 #ifdef __GNUC__
 #ifdef __MINGW32__

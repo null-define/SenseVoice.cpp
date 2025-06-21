@@ -5,7 +5,7 @@
 #include "sense-voice-frontend.h"
 #include <algorithm>
 #include <cassert>
-#include "ThreadPool.h"
+#include "thread-pool.h"
 #include "log-mel-filter-bank.h"
 
 #define M_2PI 6.283185307179586476925286766559005

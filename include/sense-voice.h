@@ -5,10 +5,7 @@
 #ifndef SENSEVOICE_CPP_SENSE_VOICE_H
 #define SENSEVOICE_CPP_SENSE_VOICE_H
 
-#include "common.h"
-#include "sense-voice-encoder.h"
-
-
+#include "sense-voice-common.h"
 
 
 int sense_voice_lang_id(const char * lang);

@@ -1,7 +1,7 @@
 //
 // Created by lovemefan on 2024/7/21.
 //
-#include "common.h"
+#include "sense-voice-common.h"
 #include "sense-voice.h"
 #include "silero-vad.h"
 #include <cmath>

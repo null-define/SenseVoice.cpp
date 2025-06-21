@@ -2,7 +2,7 @@
 // Created by lovemefan on 2024/7/19.
 //
 #include "sense-voice.h"
-#include "common.h"
+#include "sense-voice-common.h"
 #include "sense-voice-cmvn.h"
 #include "sense-voice-decoder.h"
 #include "sense-voice-encoder.h"
@@ -476,7 +476,7 @@ static bool sense_voice_sched_graph_init(
     auto &sched = allocr.sched;
     auto &meta = allocr.meta;
 
-    sched = ggml_backend_sched_new(backends.data(), nullptr, backends.size(), SENSE_VOICE_MAX_NODES, false);
+    sched = ggml_backend_sched_new(backends.data(), nullptr, backends.size(), SENSE_VOICE_MAX_NODES, false, true);
 
     meta.resize(ggml_tensor_overhead() * SENSE_VOICE_MAX_NODES +
                 ggml_graph_overhead());

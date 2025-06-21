@@ -7,8 +7,7 @@
 
 
 #include <ggml.h>
-#include "common.h"
-
+#include "sense-voice-common.h"
 
 struct silero_vad_stft {
     struct ggml_tensor *forward_basis_buffer;
