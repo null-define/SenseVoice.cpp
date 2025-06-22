@@ -700,7 +700,7 @@ int sense_voice_pcm_to_feature_with_state(struct sense_voice_context *ctx,
                            state->feature.frame_size,
                            state->feature.frame_step,
                            state->feature.n_mel,
-                           n_threads, true, cmvn, state->feature);
+                           n_threads, false, cmvn, state->feature);
 
     state->t_feature_us = ggml_time_us() - t_start_us;
 
