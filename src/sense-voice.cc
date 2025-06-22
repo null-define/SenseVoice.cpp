@@ -2,8 +2,8 @@
 // Created by lovemefan on 2024/7/19.
 //
 #include "sense-voice.h"
-#include "sense-voice-common.h"
 #include "sense-voice-cmvn.h"
+#include "sense-voice-common.h"
 #include "sense-voice-decoder.h"
 #include "sense-voice-encoder.h"
 #include "silero-vad.h"
@@ -15,6 +15,25 @@
 #define SENSE_VOICE_MAX_DECODERS 8
 #define SENSE_VOICE_CHUNK_SIZE 20
 #define SENSE_VOICE_FEATURES_DIM 560
+
+
+void sense_voice_batch_print_output(struct sense_voice_context *ctx, bool need_prefix, bool use_itn = false, bool refresh_self = false) {
+    SENSE_VOICE_LOG_INFO("=======================================\n");
+    SENSE_VOICE_LOG_INFO("batch size: %ld\n", ctx->state->segmentIDs.size());
+    for (size_t i = 0; i < ctx->state->segmentIDs.size(); i++) {
+        const int resultID = ctx->state->segmentIDs[i];
+        const sense_voice_segment &result = ctx->state->result_all[resultID];
+        printf("[%.2f-%.2f]", result.t0 * 1.0 / SENSE_VOICE_SAMPLE_RATE, result.t1 * 1.0 / SENSE_VOICE_SAMPLE_RATE);
+        for (size_t j = (need_prefix ? 0 : 4); j < result.tokens.size(); j++) {
+            int id = result.tokens[j];
+            if (!id || (j > 0 && result.tokens[j - 1] == id))
+                continue;
+            printf("%s", ctx->vocab.id_to_token[id].c_str());
+        }
+        if (!refresh_self) printf("\n");
+    }
+}
+
 
 int sense_voice_lang_id(const char *lang) {
     if (!g_lang.count(lang)) {
@@ -89,11 +108,11 @@ bool sense_voice_model_load(const char *path_model, sense_voice_context &sctx) {
     // kv data
     {
         SENSE_VOICE_LOG_INFO("%s: version:      %d\n", __func__,
-                            gguf_get_version(gguf_ctx));
+                             gguf_get_version(gguf_ctx));
         SENSE_VOICE_LOG_INFO("%s: alignment:   %zu\n", __func__,
-                            gguf_get_alignment(gguf_ctx));
+                             gguf_get_alignment(gguf_ctx));
         SENSE_VOICE_LOG_INFO("%s: data offset: %zu\n", __func__,
-                            gguf_get_data_offset(gguf_ctx));
+                             gguf_get_data_offset(gguf_ctx));
 
         const int n_kv = gguf_get_n_kv(gguf_ctx);
 
@@ -767,23 +786,24 @@ int sense_voice_full_with_state(
 }
 
 int sense_voice_full_parallel(struct sense_voice_context *ctx,
-                              sense_voice_full_params &params,
-                              std::vector<double> &pcmf32,
+                              const sense_voice_full_params *params,
+                              const double *samples,
                               int n_samples,
                               int n_processors) {
-    return sense_voice_full_with_state(ctx, ctx->state, params, pcmf32, n_samples);
+    std::vector<double> pcmf32_vec(samples, samples + n_samples);
+    return sense_voice_full_with_state(ctx, ctx->state, *params, pcmf32_vec, n_samples);
 }
 
-void sense_voice_print_output(struct sense_voice_context *ctx, bool need_prefix, bool use_itn, bool refresh_self) {
-    for (size_t i = (need_prefix ? 0 : 4); i < ctx->state->ids.size(); i++) {
-        int id = ctx->state->ids[i];
-        if (i > 0 && ctx->state->ids[i - 1] == ctx->state->ids[i])
-            continue;
-        if (id)
-            printf("%s", ctx->vocab.id_to_token[id].c_str());
-    }
-    if (!refresh_self) printf("\n");
-}
+// void sense_voice_print_output(struct sense_voice_context *ctx, bool need_prefix, bool use_itn, bool refresh_self) {
+//     for (size_t i = (need_prefix ? 0 : 4); i < ctx->state->ids.size(); i++) {
+//         int id = ctx->state->ids[i];
+//         if (i > 0 && ctx->state->ids[i - 1] == ctx->state->ids[i])
+//             continue;
+//         if (id)
+//             printf("%s", ctx->vocab.id_to_token[id].c_str());
+//     }
+//     if (!refresh_self) printf("\n");
+// }
 
 int sense_voice_batch_pcm_to_feature_with_state(struct sense_voice_context *ctx,
                                                 struct sense_voice_state *state,
@@ -797,10 +817,9 @@ int sense_voice_batch_pcm_to_feature_with_state(struct sense_voice_context *ctx,
     size_t max_len = 0;
     for (size_t segmentID: state->segmentIDs)
         max_len = std::max(max_len, state->result_all[segmentID].samples.size());
-    for (size_t segmentID: state->segmentIDs)
-    {
-        std::vector<double>& pcmf32 = state->result_all[segmentID].samples;
-        if(pcmf32.size() < max_len) {
+    for (size_t segmentID: state->segmentIDs) {
+        std::vector<double> &pcmf32 = state->result_all[segmentID].samples;
+        if (pcmf32.size() < max_len) {
             pcmf32.insert(pcmf32.end(), max_len - pcmf32.size(), 0);
         }
         // 这里实际上可以const。
@@ -894,13 +913,11 @@ int sense_voice_batch_full(struct sense_voice_context *ctx, const sense_voice_fu
 
 int sense_voice_batch_pcmf(struct sense_voice_context *ctx, const sense_voice_full_params &params, std::vector<std::vector<double>> &pcmf32,
                            size_t max_batch_len, size_t max_batch_cnt,
-                           bool use_prefix, bool use_itn) 
-{
+                           bool use_prefix, bool use_itn) {
     // 还是要有ctx，重复生成会重复读取模型，有点耗性能
     // ctx中的参数需要在外面赋值，外面的参数形态各异，带不进来
     // pcmf32是vector<vecotr>，因此不需要split
-    for(size_t segmentID = 0; segmentID < pcmf32.size(); segmentID++)
-    {
+    for (size_t segmentID = 0; segmentID < pcmf32.size(); segmentID++) {
         sense_voice_segment pcmf_tmp;
         pcmf_tmp.t0 = pcmf_tmp.t1 = 0;
         pcmf_tmp.samples = pcmf32[segmentID];
@@ -937,19 +954,18 @@ int sense_voice_batch_pcmf(struct sense_voice_context *ctx, const sense_voice_fu
     return 0;
 }
 
-void sense_voice_batch_print_output(struct sense_voice_context *ctx, bool need_prefix, bool use_itn, bool refresh_self) {
-    SENSE_VOICE_LOG_INFO("=======================================\n");
-    SENSE_VOICE_LOG_INFO("batch size: %ld\n", ctx->state->segmentIDs.size());
-    for (size_t i = 0; i < ctx->state->segmentIDs.size(); i++) {
-        const int resultID = ctx->state->segmentIDs[i];
-        const sense_voice_segment &result = ctx->state->result_all[resultID];
-        printf("[%.2f-%.2f]", result.t0 * 1.0 / SENSE_VOICE_SAMPLE_RATE, result.t1 * 1.0 / SENSE_VOICE_SAMPLE_RATE);
-        for (size_t j = (need_prefix ? 0 : 4); j < result.tokens.size(); j++) {
-            int id = result.tokens[j];
-            if (!id || (j > 0 && result.tokens[j - 1] == id))
-                continue;
-            printf("%s", ctx->vocab.id_to_token[id].c_str());
-        }
-        if (!refresh_self) printf("\n");
+const char *sense_voice_full_get_text(struct sense_voice_context *ctx, bool need_prefix) {
+    for (size_t i = (need_prefix ? 0 : 4); i < ctx->state->ids.size(); i++) {
+        int id = ctx->state->ids[i];
+        if (i > 0 && ctx->state->ids[i - 1] == ctx->state->ids[i])
+            continue;
+        if (id)
+            ctx->state->full_text += ctx->vocab.id_to_token[id];
     }
+    return ctx->state->full_text.c_str();
+}
+
+void sense_voice_reset_ctx_state(struct sense_voice_context *ctx) {
+    sense_voice_free_state(ctx->state);
+    ctx->state = sense_voice_init_state(ctx);
 }

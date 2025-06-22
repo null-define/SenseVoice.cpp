@@ -7,6 +7,9 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE STRING "")
 
 set(CMAKE_CXX_STANDARD 11)
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|MSVC")
+    add_compile_options(-Wall -Wextra)
+endif()
 
 if(NOT CMAKE_BUILD_TYPE)
     message(STATUS "No CMAKE_BUILD_TYPE given, default to Release")
@@ -20,7 +23,6 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
 else ()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall -pthread")
 endif ()
-
 
 
 if (EMSCRIPTEN)
@@ -83,16 +85,20 @@ if (NOT TARGET ggml)
 endif()
 
 aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/src SENSE_VOICE_SRC)
-add_library(sense-voice-core STATIC ${SENSE_VOICE_SRC})
+
+add_library(sense-voice-core ${CMAKE_CURRENT_SOURCE_DIR}/include/sense-voice.h ${SENSE_VOICE_SRC})
+
 target_include_directories(sense-voice-core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
 target_link_libraries(sense-voice-core ggml)
+
+set_target_properties(sense-voice-core PROPERTIES PUBLIC_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/include/sense-voice.h)
+install(TARGETS sense-voice-core LIBRARY PUBLIC_HEADER)
+
 if (SENSEVOICE_BUILD_TESTS)
     message(DEBUG "Test scripts")
 #    add_subdirectory(test)
 endif ()
 
-if (SENSE_VOICE_BUILD_EXAMPLES)
-    add_subdirectory(examples)
-endif()
 
 
